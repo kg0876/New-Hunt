@@ -1,0 +1,13 @@
+<!doctype html><html><head><meta charset="utf-8"><title>API Test</title>
+<link rel="stylesheet" href="assets/app.css"></head><body>
+<h3>API Test: /api/search</h3>
+<div class="card"><button id="btn">Run</button><pre id="out" class="mono"></pre></div>
+<script>
+document.getElementById('btn').onclick = async () => {
+  const url = new URL('/api/search', location.origin);
+  url.searchParams.set('query','Financial Analyst in Ontario, Canada');
+  url.searchParams.set('date_posted','today'); url.searchParams.set('page','1'); url.searchParams.set('num_pages','1');
+  const res = await fetch(url); const txt = await res.text();
+  document.getElementById('out').textContent = 'Status '+res.status+'\n\n'+txt.slice(0,2000);
+};
+</script></body></html>

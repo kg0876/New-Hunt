@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JobHunt Core + LaTeX Blocks</title>
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body>
+<header><div class="row"><strong>JobHunt Core</strong><a href="api-test.html"><button class="secondary">API Test</button></a></div></header>
+
+<section class="card">
+  <h3>Find Jobs (Last 24h)</h3>
+  <div class="row">
+    <input id="q" value="Financial Analyst" placeholder="Keyword">
+    <input id="loc" value="Ontario, Canada" placeholder="Location">
+    <button id="searchBtn">Fetch Jobs</button>
+    <button id="sampleBtn" class="secondary">Load Sample</button>
+  </div>
+  <div id="status" class="mono small"></div>
+</section>
+
+<div class="grid">
+  <section class="card">
+    <h4>Results</h4>
+    <div id="jobs" class="scroll"></div>
+  </section>
+
+  <aside class="card">
+    <h4>JD-tailored LaTeX Blocks</h4>
+    <div class="mono small" id="jobMeta"></div>
+    <textarea id="jd" rows="7" placeholder="Click a job to auto-fill JD"></textarea>
+    <input id="keywords" placeholder="Missing keywords (comma-separated)">
+    <div class="row">
+      <button id="genBlocks" class="secondary">Generate Blocks</button>
+      <button id="clearBlocks" class="secondary">Clear</button>
+    </div>
+    <hr>
+    <h5>Header</h5>
+    <textarea id="blockHeader" rows="4"></textarea><button class="copybtn" data-copy="#blockHeader">Copy Header</button>
+    <h5>Skills</h5>
+    <textarea id="blockSkills" rows="8"></textarea><button class="copybtn" data-copy="#blockSkills">Copy Skills</button>
+    <h5>Experience (S&P Global + SG Analytics)</h5>
+    <textarea id="blockExp" rows="20"></textarea><button class="copybtn" data-copy="#blockExp">Copy Experience</button>
+  </aside>
+</div>
+
+<script>
+let lastJobs=[];
+function setStatus(t){ document.getElementById('status').textContent = t||''; }
+function h(s){ return (s||'').replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+async function fetchJobs(){
+  const q=document.getElementById('q').value.trim()||'Financial Analyst';
+  const loc=document.getElementById('loc').value.trim()||'Ontario, Canada';
+  const url = new URL('/api/search', location.origin);
+  url.searchParams.set('query', `${q} in ${loc}`);
+  url.searchParams.set('date_posted', 'today'); url.searchParams.set('page','1'); url.searchParams.set('num_pages','1');
+  setStatus('Fetching…');
+  try{
+    const res = await fetch(url.toString(), { headers: { 'accept': 'application/json' } });
+    const txt = await res.text();
+    if(!res.ok){ setStatus('API error '+res.status+': '+txt.slice(0,160)); return; }
+    const data = JSON.parse(txt);
+    lastJobs=(data.data||[]).sort((a,b)=>(b.job_posted_at_timestamp||0)-(a.job_posted_at_timestamp||0));
+    renderJobs(lastJobs); setStatus('Loaded '+lastJobs.length+' jobs.');
+  }catch(e){ setStatus('Network error: '+e.message); }
+}
+function sampleJobs(){
+  lastJobs=[
+    {job_id:'demo1',job_title:'Financial Analyst',employer_name:'DemoBank',job_city:'Toronto',job_country:'Canada',job_posted_at_datetime_utc:new Date().toISOString(),job_description:'FP&A, variance analysis, forecasting, reporting.',job_apply_link:'https://example.com/apply'},
+    {job_id:'demo2',job_title:'FP&A Analyst',employer_name:'DemoTech',job_city:'Mississauga',job_country:'Canada',job_posted_at_datetime_utc:new Date().toISOString(),job_description:'Budgeting, forecasting, Power BI dashboards.',job_apply_link:'https://example.com/apply2'}
+  ]; renderJobs(lastJobs); setStatus('Loaded sample jobs.');
+}
+function renderJobs(list){
+  const box=document.getElementById('jobs'); if(!list.length){ box.innerHTML='<small class="small">No results yet.</small>'; return; }
+  box.innerHTML=list.map(j=>{
+    const meta={id:j.job_id||j.job_title+'@'+j.employer_name,title:j.job_title,company:j.employer_name,url:j.job_apply_link||'',jd:[j.job_title,j.employer_name,j.job_description||''].join('\n\n')};
+    return `<div class="card" data-meta='${JSON.stringify(meta).replace(/'/g,'&apos;')}'>
+      <div class="row"><strong>${h(j.job_title)}</strong><span class="badge">${h(j.employer_name)}</span></div>
+      <small class="mono">${h(j.job_city?j.job_city+', '+j.job_country:j.job_country||'')} · ${h(j.job_posted_at_datetime_utc||'')}</small><br>
+      ${j.job_apply_link?`<a href="${h(j.job_apply_link)}" target="_blank">Apply / Source</a>`:''}
+      <div class="row" style="margin-top:.4rem"><button class="secondary" onclick='openCustomize(this.closest(".card"))'>Customize</button></div>
+    </div>`;
+  }).join('');
+}
+function openCustomize(card){
+  const meta=JSON.parse(card.getAttribute('data-meta').replace(/&apos;/g,"'"));
+  document.getElementById('jd').value=meta.jd||'';
+  document.getElementById('jobMeta').textContent=`${meta.title} — ${meta.company}`;
+}
+function genBlocks(){
+  const kw=(document.getElementById('keywords').value||'').split(',').map(s=>s.trim()).filter(Boolean);
+  const t=kw.slice(0,3);
+  const header=[
+"% JD-BASED RESUME HEADER",
+"\vspace{-0.6em}",
+"\noindent",
+"\textbf{\Large FINANCIAL ANALYST -- \textit{"+(t[0] || '<Skill #1>')+"}, \textit{"+(t[1] || '<Skill #2>')+"}, \textit{"+(t[2] || '<Skill #3>')+"}}",
+"\vspace{-0.4em}"
+  ].join("\n");
+  const skills=[
+"\section*{SKILLS}",
+"\vspace{-.3em}",
+"\begin{itemize}[noitemsep]",
+"  \item \textbf{Financial \& Data:} P\&L analysis, variance analysis, cash flow modeling, KPI tracking",
+"  \item \textbf{Tools \& Technology:} Excel (adv), Power BI, SQL (joins), Python (pandas basics)",
+"  \item \textbf{Reporting \& Compliance:} month-end close, management reporting, GAAP/IFRS awareness",
+"  \item \textbf{Budgeting \& Forecasting:} rolling forecasts, driver-based budgeting, scenario analysis",
+"  \item \textbf{Additional Exposure:} stakeholder communication, cross-functional collaboration",
+"\end{itemize}"
+  ].join("\n");
+  const exp=[
+"\section*{WORK EXPERIENCE}",
+"",
+"\noindent",
+"\begin{minipage}[t]{0.6\textwidth}",
+"\textbf{Financial Specialist} \\",
+"\textit{S\&P Global}",
+"\end{minipage}%",
+"\hfill%",
+"\begin{minipage}[t]{0.4\textwidth}",
+"\raggedleft",
+"\textbf{March 2022 -- December 2022} \\",
+"\textit{India}",
+"\end{minipage}",
+"",
+"\begin{itemize}[noitemsep]",
+"  \item ... % keep",
+"  \item ... % keep",
+"  \item \textbf{JD-aligned duty:} Produced monthly reporting packs with variance bridges; improved exec decision speed by ~15\%.",
+"  \item \textbf{JD-aligned duty:} Built rolling forecasts tied to revenue/cost drivers; reduced forecast error by X\%.",
+"\end{itemize}",
+"",
+"\noindent",
+"\begin{minipage}[t]{0.6\textwidth}",
+"\textbf{Financial Analyst} \\",
+"\textit{SG Analytics Pvt. Ltd. (Morgan Stanley Capital International)}",
+"\end{minipage}%",
+"\hfill%",
+"\begin{minipage}[t]{0.4\textwidth}",
+"\raggedleft",
+"\textbf{January 2018 -- February 2022} \\",
+"\textit{India}",
+"\end{minipage}",
+"",
+"\begin{itemize}[noitemsep]",
+"  \item ... % keep",
+"  \item ... % keep",
+"  \item \textbf{JD-aligned duty:} Consolidated multi-entity data into standardized P\&L/KPI views; surfaced drivers/risks for recommendations.",
+"  \item \textbf{JD-aligned duty:} Designed month-end close workflows (recs, variance commentary) cutting cycle time by X days.",
+"\end{itemize}"
+  ].join("\n");
+
+  document.getElementById('blockHeader').value=header;
+  document.getElementById('blockSkills').value=skills;
+  document.getElementById('blockExp').value=exp;
+}
+function copySel(sel){ const el=document.querySelector(sel); el.select(); document.execCommand('copy'); }
+document.addEventListener('click',(e)=>{ if(e.target.classList.contains('copybtn')){ copySel(e.target.dataset.copy); e.target.textContent='Copied!'; setTimeout(()=>e.target.textContent='Copy',800); } });
+document.getElementById('searchBtn').addEventListener('click', fetchJobs);
+document.getElementById('sampleBtn').addEventListener('click', sampleJobs);
+document.getElementById('genBlocks').addEventListener('click', genBlocks);
+document.getElementById('clearBlocks').addEventListener('click', ()=>{ ['jd','keywords','blockHeader','blockSkills','blockExp'].forEach(id=>document.getElementById(id).value=''); document.getElementById('jobMeta').textContent=''; });
+</script>
+</body></html>

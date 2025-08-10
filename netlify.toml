@@ -1,0 +1,13 @@
+
+[build]
+  publish = "."
+  functions = "netlify/functions"
+
+[build.environment]
+  RAPIDAPI_KEY = "b7ca595a9cmsh57891c9464d272fp1d4f8djsn67313b6cbea6"
+
+[[redirects]]
+  from = "/api/search"
+  to = "/.netlify/functions/jsearch"
+  status = 200
+  force = true
